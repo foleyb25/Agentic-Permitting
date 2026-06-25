@@ -1,3 +1,72 @@
-Claude\ Guides
-claude-tool-use
+# --- Project-specific: vendored reference repos (kept out of this repo) ---
+Claude Guides/
+claude-tool-use/
+
+# --- Secrets / environment ---
+# Never commit real env files; the documented template is tracked.
+.env
+.env.*
+!.env.example
+
+# --- Python bytecode / packaging ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+*.manifest
+*.spec
+
+# --- Virtual environments ---
+.venv/
+venv/
+ENV/
+env/
+# Note: uv.lock is intentionally committed (it pins the dependency tree).
+
+# --- Test / type / lint caches ---
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+
+# --- Coverage ---
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.cover
+
+# --- Jupyter / notebooks ---
+.ipynb_checkpoints/
+
+# --- Local databases / fixtures (MCP/Postgres dev artifacts) ---
+*.sqlite
+*.sqlite3
+*.db
+
+# --- Logs ---
+*.log
+
+# --- Claude Code local (personal) settings ---
+# settings.json is shared; settings.local.json is per-developer.
+.claude/settings.local.json
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- OS cruft ---
 .DS_Store
+Thumbs.db
