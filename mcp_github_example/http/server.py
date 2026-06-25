@@ -1,5 +1,6 @@
 # server.py  —  MCP server: single Streamable-HTTP endpoint, bearer auth
 # uv add fastmcp starlette uvicorn
+import hmac
 import os
 from typing import Annotated
 
@@ -11,7 +12,10 @@ from starlette.responses import JSONResponse
 
 mcp = FastMCP("permit-tools")
 
-EXPECTED_TOKEN = os.environ["MCP_AUTH_TOKEN"]  # the server's expected bearer token
+# Required only for the HTTP transport (BearerAuth below). Read lazily so the
+# module still imports under `fastmcp dev` (stdio) without the env var set —
+# stdio never goes through the middleware, so no token is needed to inspect tools.
+EXPECTED_TOKEN = os.environ.get("MCP_AUTH_TOKEN")
 
 
 @mcp.tool
@@ -31,8 +35,10 @@ class BearerAuth(BaseHTTPMiddleware):
     """Per-request credential — the OTHER kind of agent-passed variable: an HTTP
     header, validated server-side, never exposed as a tool parameter."""
     async def dispatch(self, request, call_next):
+        if not EXPECTED_TOKEN:  # fail closed: HTTP transport must be configured
+            return JSONResponse({"error": "server auth not configured"}, status_code=500)
         header = request.headers.get("authorization", "")
-        if header != f"Bearer {EXPECTED_TOKEN}":
+        if not hmac.compare_digest(header, f"Bearer {EXPECTED_TOKEN}"):  # constant-time
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         return await call_next(request)
 

@@ -17,10 +17,11 @@ Files are grouped by the **transport** the demo uses:
   mcp_github_example/
   ├── ARCHITECTURE.md        ← you are here (covers both demos)
   ├── http/                  ← Demo A: Streamable-HTTP transport
-  │   ├── client.py
+  │   ├── host.py            ← LLM + agentic loop (drives server.py)
+  │   ├── client.py          ← bare connector (one tool call, no LLM)
   │   └── server.py
   └── stdio/                 ← Demo B: stdio transport (+ supporting files)
-      ├── host.py
+      ├── host.py            ← LLM + agentic loop (drives GitHub MCP server)
       ├── github_api.py
       └── Dockerfile
 ```
@@ -54,20 +55,27 @@ not call each other. Keep them mentally distinct.
 ```
    ┌───────────────────────── DEMO A: "Our own server" ─────────────────────────┐
    │                                                                             │
-   │     client.py  ──HTTP /mcp + Bearer──▶  server.py  ──▶  lookup_permit()     │
-   │     (MCP client)                        (MCP server)     (in-process logic)  │
+   │   http/host.py   ──HTTP /mcp + Bearer──▶  server.py  ──▶  lookup_permit()   │
+   │   (host: LLM + loop)                      (MCP server)    (in-process logic) │
    │                                                                             │
+   │   http/client.py ──HTTP /mcp + Bearer──▶  server.py   (bare connector demo: │
+   │   (client only, no LLM)                               one call_tool, no loop)│
    └─────────────────────────────────────────────────────────────────────────────┘
 
    ┌───────────────── DEMO B: "Host drives a 3rd-party server" ──────────────────┐
    │                                                                             │
-   │   host.py  ──stdio──▶  GitHub MCP server  ──HTTPS──▶  api.github.com         │
-   │   (host + client)      (Docker container)             (upstream REST)        │
+   │   stdio/host.py  ──stdio──▶  GitHub MCP server  ──HTTPS──▶  api.github.com   │
+   │   (host: LLM + loop)         (Docker container)            (upstream REST)    │
    │                                                                             │
    │   github_api.py = a hand-written illustration of the HTTPS call the         │
    │                   GitHub MCP server makes internally (not imported anywhere) │
    └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **Host vs. client.** In both demos the **agentic loop lives in `host.py`**, never
+> in `client.py`. The client is a dumb connector (open session → list/call tools);
+> the host wraps an LLM around it and runs the call → result → call loop. `http/`
+> shows both: `host.py` (with the loop) and `client.py` (the bare connector).
 
 ---
 
@@ -245,3 +253,36 @@ Trust boundaries crossed (each `║` is an authenticated hop):
 
   Dockerfile  ............ wraps server.py only.
 ```
+
+---
+
+## 9. Inspecting the server (MCP Inspector)
+
+The **MCP Inspector** is the official point-and-click UI for exercising a server by
+hand — no LLM, no code. It's a visual version of `client.py`: it lists every tool /
+resource / prompt with the exact schema the model sees, and lets you invoke them and
+read the raw response. FastMCP launches it for you:
+
+```bash
+uv run fastmcp dev inspector mcp_github_example/http/server.py
+```
+
+This imports the `mcp` instance from `server.py`, runs it over **stdio**, and opens
+the Inspector connected to it. Then in the browser: pick `lookup_permit`, enter
+`permit_id = P-12345`, and see the result — or try an invalid id to watch the
+`ToolError` surface.
+
+```
+   ┌──────────────────────────────┐        ┌──────────────────────┐
+   │   MCP Inspector (browser)    │  stdio  │   server.py (mcp)     │
+   │   list tools / fill args /   │ ◀─────▶ │   lookup_permit()     │
+   │   call / view raw JSON       │         └──────────────────────┘
+   └──────────────────────────────┘
+```
+
+**Notes:**
+- `fastmcp dev` uses **stdio**, so it bypasses the HTTP `BearerAuth` middleware
+  entirely — you do **not** need `MCP_AUTH_TOKEN` set. `server.py` reads that var
+  lazily (`os.environ.get`) precisely so it imports cleanly here.
+- Requires `uv` (the project's package manager) on your PATH. The Inspector itself
+  is a Node tool that `fastmcp dev` launches via `npx`.
