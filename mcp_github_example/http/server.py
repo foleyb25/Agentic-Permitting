@@ -1,14 +1,21 @@
 # server.py  —  MCP server: single Streamable-HTTP endpoint, bearer auth
-# uv add fastmcp starlette uvicorn
+# uv add fastmcp starlette uvicorn python-dotenv
 import hmac
 import os
 from typing import Annotated
 
+from dotenv import find_dotenv, load_dotenv
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+
+# Load a project .env (searched upward from this file, so the repo-root .env is
+# found regardless of cwd) into the environment BEFORE anything reads os.environ.
+# The MCP Inspector spawns this server with only a safe subset of system env vars,
+# so .env is how local config/secrets reach the server during `fastmcp dev`.
+load_dotenv(find_dotenv(usecwd=True) or find_dotenv())
 
 mcp = FastMCP("permit-tools")
 
